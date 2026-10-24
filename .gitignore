@@ -34,5 +34,8 @@ sysinfo.txt
 # Crashlytics (varsa)
 crashlytics-build.properties
 
+# Unity'nin paket/sürüm yükseltmelerinde ürettiği geçici rapor dosyası
+UpgradeLog.htm
+
 # .vsconfig genelde her geliştiricide farklı olabilir, paylaşmaya gerek yok
 .vsconfig
