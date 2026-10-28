@@ -15,7 +15,8 @@ public class MovingToLeverState : IState
     public void Tick()
     {
         bool stillCalculatingPath = companion.Agent.pathPending;
-        bool arrived = companion.Agent.remainingDistance <= companion.ArrivalThreshold;
+        bool hasCompletePath = companion.Agent.pathStatus == UnityEngine.AI.NavMeshPathStatus.PathComplete;
+        bool arrived = hasCompletePath && companion.Agent.remainingDistance <= companion.ArrivalThreshold;
 
         if (!stillCalculatingPath && arrived)
         {

@@ -7,6 +7,7 @@ using UnityEngine.InputSystem;
 public class CompanionController : MonoBehaviour
 {
     [SerializeField] private Transform leverTarget;
+    [SerializeField] private Transform farSideTarget;
     [SerializeField] private Transform playerTransform;
     [SerializeField] private float arrivalThreshold = 0.5f;
     [SerializeField] private LayerMask sensorObstacleMask;
@@ -14,13 +15,16 @@ public class CompanionController : MonoBehaviour
 
     public NavMeshAgent Agent { get; private set; }
     public Transform LeverTarget => leverTarget;
+    public Transform FarSideTarget => farSideTarget;
     public Transform PlayerTransform => playerTransform;
     public float ArrivalThreshold => arrivalThreshold;
+    public bool ObstacleCleared { get; private set; }
 
     public IState IdleState { get; private set; }
     public IState MovingToLeverState { get; private set; }
     public IState VerifyingSpotState { get; private set; }
     public IState PullingLeverState { get; private set; }
+    public IState CrossingState { get; private set; }
     public IState ReturningState { get; private set; }
 
     private StateMachine stateMachine;
@@ -34,6 +38,7 @@ public class CompanionController : MonoBehaviour
         MovingToLeverState = new MovingToLeverState(this);
         VerifyingSpotState = new VerifyingSpotState(this);
         PullingLeverState = new PullingLeverState(this);
+        CrossingState = new CrossingState(this);
         ReturningState = new ReturningState(this);
     }
 
@@ -59,10 +64,18 @@ public class CompanionController : MonoBehaviour
 
     public void CommandToLever()
     {
+        Debug.Log($"CommandToLever cagrildi. Su anki durum Idle mi: {stateMachine.CurrentState == IdleState}");
+
         if (stateMachine.CurrentState == IdleState)
         {
+            ObstacleCleared = false;
             ChangeState(MovingToLeverState);
         }
+    }
+
+    public void NotifyObstacleCleared()
+    {
+        ObstacleCleared = true;
     }
 
     public bool HasClearPathTo(Vector3 targetPosition)

@@ -1,11 +1,6 @@
-using UnityEngine;
-
 public class PullingLeverState : IState
 {
-    private const float PullDurationSeconds = 1.5f;
-
     private readonly CompanionController companion;
-    private float elapsed;
 
     public PullingLeverState(CompanionController companion)
     {
@@ -14,17 +9,14 @@ public class PullingLeverState : IState
 
     public void Enter()
     {
-        elapsed = 0f;
         companion.TriggerLever();
     }
 
     public void Tick()
     {
-        elapsed += Time.deltaTime;
-
-        if (elapsed >= PullDurationSeconds)
+        if (companion.ObstacleCleared)
         {
-            companion.ChangeState(companion.ReturningState);
+            companion.ChangeState(companion.CrossingState);
         }
     }
 
