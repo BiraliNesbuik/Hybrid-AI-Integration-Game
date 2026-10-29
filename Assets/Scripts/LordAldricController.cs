@@ -3,6 +3,8 @@ using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Networking;
+using TMPro;
+using UnityEngine.UI;
 
 public class LordAldricController : MonoBehaviour
 {
@@ -15,6 +17,12 @@ public class LordAldricController : MonoBehaviour
     [Range(0, 100)] public int trust = 30;
     [Range(0, 100)] public int anger = 0;
     [Range(0, 100)] public int respect = 30;
+
+    [Header("Dialogue UI")]
+    public TMP_Text dialogueText;
+    public TMP_InputField playerInput;
+    public Button sendButton;
+    public TMP_Text relationshipText;
 
     [Serializable]
     private class ChatMessage
@@ -83,7 +91,7 @@ Respect: {respect}
 Return ONLY a valid JSON object with these fields:
 {{
   ""dialogue"": ""Your spoken response"",
-  ""intent"": ""continue_conversation, share_information, agree_to_help, refuse_help, or end_conversation"",
+  ""intent"": ""continue_conversation, share_information, agreed_to_help, refuse_help, or end_conversation"",
   ""reason"": ""Brief explanation"",
   ""memory_candidate"": ""Important event or empty string""
 }}
@@ -117,6 +125,22 @@ Use complete, natural sentences in the dialogue field.
         StartCoroutine(SendMessageCoroutine(playerMessage));
     }
 
+    public void SendPlayerMessage()
+    {
+        if (playerInput == null)
+        {
+            Debug.LogError("PlayerInput is not assigned.");
+            return;
+        }
+
+        string message = playerInput.text.Trim();
+
+        if (string.IsNullOrEmpty(message))
+            return;
+
+        SendMessageToAldric(message);
+    }
+
     private IEnumerator SendMessageCoroutine(string playerMessage)
     {
         isProcessing = true;
@@ -142,7 +166,7 @@ Use complete, natural sentences in the dialogue field.
             request.uploadHandler = new UploadHandlerRaw(body);
             request.downloadHandler = new DownloadHandlerBuffer();
             request.SetRequestHeader("Content-Type", "application/json");
-            request.timeout = 60;
+            request.timeout = 180;
 
             Debug.Log("Sending message to Lord Aldric...");
 
@@ -210,7 +234,7 @@ Use complete, natural sentences in the dialogue field.
                 {
                     "continue_conversation",
                     "share_information",
-                    "agree_to_help",
+                    "agreed_to_help",
                     "refuse_help",
                     "end_conversation"
                 };
@@ -229,18 +253,29 @@ Use complete, natural sentences in the dialogue field.
                 }
                 else if (
                     (decision.intent == "share_information" ||
-                     decision.intent == "agree_to_help") &&
+                     decision.intent == "agreed_to_help") &&
                     (trust < 50 || anger >= 60))
                 {
                     decision.intent = "refuse_help";
                 }
 
-                Debug.Log($"Aldric: {decision.dialogue}");
-                Debug.Log($"Intent: {decision.intent}");
-                Debug.Log($"Reason: {decision.reason}");
-                Debug.Log(
-                    $"Trust: {trust} | Anger: {anger} | Respect: {respect}"
-                );
+                // Display Aldric's response in the game UI.
+            if (dialogueText != null)
+            {
+                dialogueText.text = "Lord Aldric: " + decision.dialogue;
+            }
+            else
+            {
+                Debug.LogWarning("DialogueText is not assigned in the Inspector.");
+            }
+
+            // Keep the response details in the Console for debugging.
+            Debug.Log($"Aldric: {decision.dialogue}");
+            Debug.Log($"Intent: {decision.intent}");
+            Debug.Log($"Reason: {decision.reason}");
+            Debug.Log(
+                $"Trust: {trust} | Anger: {anger} | Respect: {respect}"
+            );
             }
             catch (Exception exception)
             {
