@@ -1,5 +1,7 @@
 public class IdleState : IState
 {
+    private const float FollowStopDistance = 3f;
+
     private readonly CompanionController companion;
 
     public IdleState(CompanionController companion)
@@ -9,11 +11,22 @@ public class IdleState : IState
 
     public void Enter()
     {
-        companion.Agent.ResetPath();
     }
 
     public void Tick()
     {
+        float distanceToPlayer = UnityEngine.Vector3.Distance(
+            companion.transform.position,
+            companion.PlayerTransform.position);
+
+        if (distanceToPlayer > FollowStopDistance)
+        {
+            companion.Agent.SetDestination(companion.PlayerTransform.position);
+        }
+        else
+        {
+            companion.Agent.ResetPath();
+        }
     }
 
     public void Exit()

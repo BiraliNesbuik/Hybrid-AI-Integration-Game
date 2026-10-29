@@ -16,7 +16,7 @@ public class PullingLeverState : IState
     {
         if (companion.ObstacleCleared)
         {
-            companion.ChangeState(companion.CrossingState);
+            companion.ChangeState(companion.ReturningState);
         }
     }
 
