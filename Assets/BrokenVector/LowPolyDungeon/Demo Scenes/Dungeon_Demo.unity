@@ -19971,9 +19971,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CompanionController
   leverTarget: {fileID: 1662695175}
-  farSideTarget: {fileID: 571151192}
   playerTransform: {fileID: 413699619}
-  arrivalThreshold: 0.5
+  arrivalThreshold: 0.01
   sensorObstacleMask:
     serializedVersion: 2
     m_Bits: 0
@@ -26793,37 +26792,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1745756610997673642, guid: 0d858551c205152499f976761ecef4fb, type: 3}
   m_PrefabInstance: {fileID: 569227094}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &571151191
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 571151192}
-  m_Layer: 0
-  m_Name: FarSideTarget
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &571151192
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 571151191}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 11.009, y: 0.196, z: -14.187}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &572914931
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -54606,7 +54574,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ObstacleMover
   clearedLocalPosition: {x: 14.122, y: 0, z: -14.721}
   clearedLocalEulerAngles: {x: 0, y: -1.067, z: 0}
-  moveDurationSeconds: 1.5
+  moveDurationSeconds: 0.5
   onCleared:
     m_PersistentCalls:
       m_Calls:
@@ -54632,7 +54600,7 @@ NavMeshObstacle:
   m_Enabled: 1
   serializedVersion: 3
   m_Shape: 1
-  m_Extents: {x: 0.67200005, y: 1.087, z: 0.5}
+  m_Extents: {x: 0.67200005, y: 1.087, z: 0.165}
   m_MoveThreshold: 0.1
   m_Carve: 1
   m_CarveOnlyStationary: 1
@@ -64314,6 +64282,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: Dungeon_Big_Passage
       objectReference: {fileID: 0}
+    - target: {fileID: 8011076794459216232, guid: b78909d98814b3d42aa488a008c30001, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8011076794459216232, guid: b78909d98814b3d42aa488a008c30001, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 2147483647
+      objectReference: {fileID: 0}
     - target: {fileID: 8011076794461407144, guid: b78909d98814b3d42aa488a008c30001, type: 3}
       propertyPath: m_LightProbeUsage
       value: 0
@@ -72598,7 +72574,7 @@ Transform:
   m_GameObject: {fileID: 1662695174}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 12.209, y: 0.965, z: -14.616}
+  m_LocalPosition: {x: 11.738, y: 0.965, z: -14.045}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -96095,4 +96071,3 @@ SceneRoots:
   - {fileID: 851509798}
   - {fileID: 1662695175}
   - {fileID: 2000014718}
-  - {fileID: 571151192}
