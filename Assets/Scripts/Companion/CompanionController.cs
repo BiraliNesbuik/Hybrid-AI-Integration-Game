@@ -9,6 +9,7 @@ public class CompanionController : MonoBehaviour
     [SerializeField] private Transform leverTarget;
     [SerializeField] private Transform playerTransform;
     [SerializeField] private float arrivalThreshold = 0.5f;
+    [SerializeField] private float giveUpAfterSeconds = 8f;
     [SerializeField] private LayerMask sensorObstacleMask;
     [SerializeField] private UnityEvent onLeverPulled;
 
@@ -16,7 +17,9 @@ public class CompanionController : MonoBehaviour
     public Transform LeverTarget => leverTarget;
     public Transform PlayerTransform => playerTransform;
     public float ArrivalThreshold => arrivalThreshold;
+    public float GiveUpAfterSeconds => giveUpAfterSeconds;
     public bool ObstacleCleared { get; private set; }
+    public float CommandStartTime { get; private set; }
 
     public IState IdleState { get; private set; }
     public IState MovingToLeverState { get; private set; }
@@ -63,6 +66,7 @@ public class CompanionController : MonoBehaviour
         if (stateMachine.CurrentState == IdleState)
         {
             ObstacleCleared = false;
+            CommandStartTime = Time.time;
             ChangeState(MovingToLeverState);
         }
     }

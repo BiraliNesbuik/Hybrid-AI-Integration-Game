@@ -17,6 +17,8 @@ public class VerifyingSpotState : IState
 
         if (canReachLever)
         {
+            float elapsed = UnityEngine.Time.time - companion.CommandStartTime;
+            UnityEngine.Debug.Log($"[Test] BASARILI - hedefe ulasma suresi: {elapsed:F2} sn");
             companion.ChangeState(companion.PullingLeverState);
         }
         else

@@ -2,8 +2,6 @@ using UnityEngine;
 
 public class MovingToLeverState : IState
 {
-    private const float GiveUpAfterSeconds = 8f;
-
     private readonly CompanionController companion;
     private float elapsed;
 
@@ -32,8 +30,9 @@ public class MovingToLeverState : IState
             return;
         }
 
-        if (elapsed >= GiveUpAfterSeconds)
+        if (elapsed >= companion.GiveUpAfterSeconds)
         {
+            Debug.Log($"[Test] BASARISIZ - {companion.GiveUpAfterSeconds} sn icinde hedefe ulasilamadi (pathStatus: {companion.Agent.pathStatus})");
             companion.Agent.ResetPath();
             companion.ChangeState(companion.IdleState);
         }
