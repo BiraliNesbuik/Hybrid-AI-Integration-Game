@@ -54,7 +54,7 @@ public class PlayerController : MonoBehaviour
 
     private void HandleMove()
     {
-        if (Keyboard.current == null)
+        if (Keyboard.current == null || Cursor.lockState != CursorLockMode.Locked)
         {
             return;
         }

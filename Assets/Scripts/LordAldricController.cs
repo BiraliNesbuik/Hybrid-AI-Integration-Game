@@ -269,6 +269,11 @@ Use complete, natural sentences in the dialogue field.
                 Debug.LogWarning("DialogueText is not assigned in the Inspector.");
             }
 
+            if (relationshipText != null)
+            {
+                relationshipText.text = $"Trust: {trust} | Anger: {anger} | Respect: {respect}";
+            }
+
             // Keep the response details in the Console for debugging.
             Debug.Log($"Aldric: {decision.dialogue}");
             Debug.Log($"Intent: {decision.intent}");

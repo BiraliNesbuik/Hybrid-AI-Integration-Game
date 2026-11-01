@@ -11,6 +11,7 @@ public class CompanionController : MonoBehaviour
     [SerializeField] private float arrivalThreshold = 0.5f;
     [SerializeField] private float giveUpAfterSeconds = 8f;
     [SerializeField] private LayerMask sensorObstacleMask;
+    [SerializeField] private Animator animator;
     [SerializeField] private UnityEvent onLeverPulled;
 
     public NavMeshAgent Agent { get; private set; }
@@ -49,6 +50,11 @@ public class CompanionController : MonoBehaviour
     private void Update()
     {
         stateMachine.Tick();
+
+        if (animator != null)
+        {
+            animator.SetFloat("Speed", Agent.velocity.magnitude);
+        }
 
         if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
         {
