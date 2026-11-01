@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using TMPro;
 using UnityEngine.UI;
+using UnityEngine.Events;
 
 public class LordAldricController : MonoBehaviour
 {
@@ -23,6 +24,10 @@ public class LordAldricController : MonoBehaviour
     public TMP_InputField playerInput;
     public Button sendButton;
     public TMP_Text relationshipText;
+
+    [Header("Game State")]
+    [SerializeField] private UnityEvent onDoorUnlocked;
+    private bool doorUnlocked;
 
     [Serializable]
     private class ChatMessage
@@ -272,6 +277,14 @@ Use complete, natural sentences in the dialogue field.
             if (relationshipText != null)
             {
                 relationshipText.text = $"Trust: {trust} | Anger: {anger} | Respect: {respect}";
+            }
+
+            bool shouldUnlockDoor = decision.intent == "agreed_to_help" || decision.intent == "share_information";
+
+            if (shouldUnlockDoor && !doorUnlocked)
+            {
+                doorUnlocked = true;
+                onDoorUnlocked?.Invoke();
             }
 
             // Keep the response details in the Console for debugging.
