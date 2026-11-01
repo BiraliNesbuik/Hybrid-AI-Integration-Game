@@ -144,6 +144,8 @@ Use complete, natural sentences in the dialogue field.
             return;
 
         SendMessageToAldric(message);
+        playerInput.text = "";
+        playerInput.ActivateInputField();
     }
 
     private IEnumerator SendMessageCoroutine(string playerMessage)
@@ -265,9 +267,17 @@ Use complete, natural sentences in the dialogue field.
                 }
 
                 // Display Aldric's response in the game UI.
+            // Some responses run long; cap the length so the UI never overflows.
+            const int maxDialogueLength = 220;
+            string displayedDialogue = decision.dialogue;
+            if (displayedDialogue.Length > maxDialogueLength)
+            {
+                displayedDialogue = displayedDialogue.Substring(0, maxDialogueLength).TrimEnd() + "...";
+            }
+
             if (dialogueText != null)
             {
-                dialogueText.text = "Lord Aldric: " + decision.dialogue;
+                dialogueText.text = "Lord Aldric: " + displayedDialogue;
             }
             else
             {

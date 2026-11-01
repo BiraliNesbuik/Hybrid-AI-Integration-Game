@@ -1,10 +1,12 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using TMPro;
 
 public class NpcInteractable : MonoBehaviour
 {
     [SerializeField] private GameObject interactPrompt;
     [SerializeField] private GameObject chatPanel;
+    [SerializeField] private TMP_InputField playerInputField;
 
     private bool playerInRange;
     private bool chatOpen;
@@ -25,6 +27,11 @@ public class NpcInteractable : MonoBehaviour
     private void Update()
     {
         if (!playerInRange || Keyboard.current == null)
+        {
+            return;
+        }
+
+        if (chatOpen && playerInputField != null && playerInputField.isFocused)
         {
             return;
         }
