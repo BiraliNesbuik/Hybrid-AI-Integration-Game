@@ -74,6 +74,14 @@ public class LordAldricController : MonoBehaviour
 
     private bool isProcessing;
 
+    private void Start()
+    {
+        if (playerInput != null)
+        {
+            playerInput.onSubmit.AddListener(_ => SendPlayerMessage());
+        }
+    }
+
     private string BuildSystemPrompt()
     {
         return $@"

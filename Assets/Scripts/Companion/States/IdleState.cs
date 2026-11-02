@@ -15,6 +15,12 @@ public class IdleState : IState
 
     public void Tick()
     {
+        if (!companion.FollowPlayer)
+        {
+            companion.Agent.ResetPath();
+            return;
+        }
+
         float distanceToPlayer = UnityEngine.Vector3.Distance(
             companion.transform.position,
             companion.PlayerTransform.position);
