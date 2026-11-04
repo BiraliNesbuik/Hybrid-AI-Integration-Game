@@ -21,7 +21,7 @@ public class LordAldricController : MonoBehaviour
     [Header("Ollama Settings")]
     [SerializeField] private string modelName = "lord-aldric-en";
     [SerializeField] private string ollamaUrl = "http://localhost:11434/api/chat";
-    [SerializeField] private int requestTimeoutSeconds = 180;
+    [SerializeField] private int requestTimeoutSeconds = 120;
     [SerializeField] private int numPredict = 400;   // max tokens per reply
     [SerializeField] private int numCtx = 8192;      // context window (lower to 4096 if memory is tight)
     [SerializeField] private float temperature = 0.5f;
@@ -96,6 +96,7 @@ public class LordAldricController : MonoBehaviour
         public string intent;
         public string reason;
         public string memory_candidate;
+        public string player_attitude;
     }
 
     // -----------------------------
@@ -127,40 +128,13 @@ public class LordAldricController : MonoBehaviour
         @"\b(i|i'm|i've|i'll|i'd|my|me|mine|you|your|you're|we|us|our)\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    private static readonly string[] Threats =
+    // The LLM classifies the player's message into one of these every turn;
+    // the relationship numbers move based on that classification instead of
+    // a fixed keyword list, so natural phrasing is understood correctly.
+    private static readonly string[] AllowedAttitudes =
     {
-        "i will kill you", "i'll kill you", "kill you",
-        "i will hurt you", "i'll hurt you", "threaten"
-    };
-
-    private static readonly string[] Insults =
-    {
-        "idiot", "fool", "stupid", "coward",
-        "you are useless", "you are pathetic"
-    };
-
-    private static readonly string[] Apologies =
-    {
-        "i am sorry", "i'm sorry", "my apologies", "forgive me", "i apologize"
-    };
-
-    private static readonly string[] HelpfulActions =
-    {
-        "i brought you food", "i brought food", "i helped you",
-        "i saved you", "i brought medicine", "i bandaged"
-    };
-
-    private static readonly string[] Reassurances =
-    {
-        "i will help you", "i can help you", "let me help",
-        "you can trust me", "i am not your enemy", "i'm not your enemy",
-        "i mean you no harm", "i will not hurt you", "i won't hurt you"
-    };
-
-    private static readonly string[] Compliments =
-    {
-        "you are wise", "you are brave", "i respect you",
-        "you have my respect", "honorable lord"
+        "threatening", "insulting", "apologetic",
+        "helpful", "reassuring", "complimentary", "neutral"
     };
 
     // -----------------------------
@@ -180,11 +154,11 @@ public class LordAldricController : MonoBehaviour
 
     private void Start()
     {
-        if (dialogueText == null || playerInput == null || sendButton == null)
+        if (dialogueText == null || playerInput == null)
         {
             Debug.LogError(
-                "LordAldricController: assign Dialogue Text, Player Input " +
-                "and Send Button in the Inspector.");
+                "LordAldricController: assign Dialogue Text and Player Input " +
+                "in the Inspector.");
         }
 
         // Button and Enter key are wired in code.
@@ -219,6 +193,24 @@ public class LordAldricController : MonoBehaviour
     private void TestOllamaConnection()
     {
         SendMessageToAldric("Hello, Lord Aldric.");
+    }
+
+    // TEMPORARY DEBUG TOOL: bypasses Ollama/LLM entirely and fires the door
+    // event directly, to check whether the door/lever wiring itself works
+    // independently of whether the LLM agrees to cooperate. Remove before
+    // final submission.
+    [ContextMenu("DEBUG: Force Unlock Door")]
+    private void DebugForceUnlockDoor()
+    {
+        if (doorUnlocked)
+        {
+            Debug.Log("DEBUG: Door was already unlocked.");
+            return;
+        }
+
+        doorUnlocked = true;
+        Debug.Log("DEBUG: Forcing onDoorUnlocked now (no LLM involved).");
+        onDoorUnlocked?.Invoke();
     }
 
     public void SendPlayerMessage()
@@ -269,15 +261,10 @@ public class LordAldricController : MonoBehaviour
         isProcessing = true;
         SetInputEnabled(false);
 
+        Debug.Log($"Player: {playerMessage}");
+
         string previousText = dialogueText != null ? dialogueText.text : "";
         SetDialogue("Lord Aldric: ...");
-
-        // Remember old values: a failed request must not change the relationship.
-        int oldTrust = trust;
-        int oldAnger = anger;
-        int oldRespect = respect;
-
-        UpdateRelationship(playerMessage);
 
         NpcDecision result = null;
         string error = null;
@@ -289,10 +276,7 @@ public class LordAldricController : MonoBehaviour
 
         if (result == null)
         {
-            trust = oldTrust;
-            anger = oldAnger;
-            respect = oldRespect;
-
+            // Nothing was changed yet, so there is nothing to roll back.
             Debug.LogError($"Could not get a valid response from Aldric: {error}");
 
             SetDialogue(string.IsNullOrEmpty(previousText)
@@ -305,6 +289,8 @@ public class LordAldricController : MonoBehaviour
         }
 
         // Commit only after a valid response.
+        UpdateRelationship(result.player_attitude);
+
         conversationHistory.Add(new ChatMessage("user", playerMessage));
         conversationHistory.Add(new ChatMessage("assistant", result.dialogue));
 
@@ -317,14 +303,21 @@ public class LordAldricController : MonoBehaviour
         RefreshRelationshipUi();
 
         Debug.Log($"Aldric: {result.dialogue}");
-        Debug.Log($"Intent: {result.intent} | Reason: {result.reason}");
+        Debug.Log($"Intent: {result.intent} | Reason: {result.reason} | Player attitude: {result.player_attitude}");
         Debug.Log($"Trust: {trust} | Anger: {anger} | Respect: {respect}");
 
-        if (!doorUnlocked &&
-            (result.intent == "agreed_to_help" ||
-             result.intent == "share_information"))
+        // Primary trigger: the trust number itself, computed every turn from the
+        // LLM's own attitude classification - more reliable than trusting the
+        // LLM to also correctly self-report "agreed_to_help" in a second field.
+        // Kept together with the intent check so a genuine LLM agreement still
+        // counts even before trust reaches the threshold.
+        bool trustThresholdReached = trust >= 60 && anger < 60;
+        bool intentAgreed = result.intent == "agreed_to_help" || result.intent == "share_information";
+
+        if (!doorUnlocked && (trustThresholdReached || intentAgreed))
         {
             doorUnlocked = true;
+            Debug.Log($"Door unlocked. Reason: {(trustThresholdReached ? "trust threshold reached" : "LLM intent")}.");
             onDoorUnlocked?.Invoke();
         }
 
@@ -374,54 +367,44 @@ public class LordAldricController : MonoBehaviour
     // RELATIONSHIP RULES
     // -----------------------------
 
-    private static bool ContainsAny(string text, string[] phrases)
+    /// <summary>
+    /// Moves trust/anger/respect based on the LLM's own classification of the
+    /// player's last message (see player_attitude in the JSON schema), instead
+    /// of matching a fixed keyword list against free-form text.
+    /// </summary>
+    private void UpdateRelationship(string attitude)
     {
-        foreach (string phrase in phrases)
+        switch (attitude)
         {
-            if (text.Contains(phrase))
-                return true;
-        }
-        return false;
-    }
-
-    private void UpdateRelationship(string playerMessage)
-    {
-        string text = playerMessage.ToLowerInvariant();
-
-        // One category per message so rules do not stack.
-        if (ContainsAny(text, Threats))
-        {
-            anger += 15;
-            trust -= 10;
-            respect -= 8;
-        }
-        else if (ContainsAny(text, Insults))
-        {
-            anger += 18;
-            trust -= 10;
-            respect -= 10;
-        }
-        else if (ContainsAny(text, Apologies))
-        {
-            anger -= 7;
-            trust += 3;
-            respect += 2;
-        }
-        else if (ContainsAny(text, HelpfulActions))
-        {
-            anger -= 5;
-            trust += 12;
-            respect += 8;
-        }
-        else if (ContainsAny(text, Reassurances))
-        {
-            anger -= 2;
-            trust += 3;
-        }
-        else if (ContainsAny(text, Compliments))
-        {
-            respect += 5;
-            trust += anger >= 30 ? 1 : 3;
+            case "threatening":
+                anger += 15;
+                trust -= 10;
+                respect -= 8;
+                break;
+            case "insulting":
+                anger += 18;
+                trust -= 10;
+                respect -= 10;
+                break;
+            case "apologetic":
+                anger -= 7;
+                trust += 10;
+                respect += 2;
+                break;
+            case "helpful":
+                anger -= 5;
+                trust += 10;
+                respect += 8;
+                break;
+            case "reassuring":
+                anger -= 2;
+                trust += 10;
+                break;
+            case "complimentary":
+                respect += 5;
+                trust += 10;
+                break;
+            // "neutral" or anything unrecognized: no change.
         }
 
         trust = Mathf.Clamp(trust, 0, 100);
@@ -434,6 +417,12 @@ public class LordAldricController : MonoBehaviour
     {
         if (anger >= 85)
             return "end_conversation";
+
+        // Only the game rule above may end the conversation. The LLM choosing
+        // "end_conversation" on its own, with no real reason, would lock the
+        // player out of the dialogue permanently - so that choice is rejected.
+        if (intent == "end_conversation")
+            return "continue_conversation";
 
         bool cooperating = intent == "share_information" || intent == "agreed_to_help";
 
@@ -472,6 +461,8 @@ public class LordAldricController : MonoBehaviour
         sb.AppendLine("BACKGROUND:");
         sb.AppendLine("- You are a nobleman of the House of the Red Lion, from the kingdom of Westerland.");
         sb.AppendLine("- In the war between Westerland and Batania you were wounded and captured by the Batanian army. You have been held in the royal dungeon for three weeks. You hope your family will pay your ransom, but you would gladly escape sooner.");
+        sb.AppendLine("- This dungeon is NOT yours. It belongs to your Batanian captors. Never call it \"my dungeon\" or imply you own or rule this place - you are a prisoner here, nothing more.");
+        sb.AppendLine("- You are currently in Batania, the enemy kingdom, not in Westerland. You have not seen Westerland in a long time. The player is here with you in this Batanian dungeon, right now - never ask what they are doing \"in Westerland\" or talk as if either of you is there.");
         sb.AppendLine("- As a noble you had more freedom than other prisoners, so you explored the dungeon and memorized its layout. It has only one exit, which is normally guarded and locked.");
         sb.AppendLine("- You discovered a hidden mechanism in the kitchen that opens that exit. You have told nobody. It is extremely valuable to you.");
         sb.AppendLine("- A prisoner riot has just broken out. Prisoners mistook you for a Batanian nobleman and beat you unconscious. Your leg is badly injured and walking is difficult.");
@@ -483,12 +474,15 @@ public class LordAldricController : MonoBehaviour
         sb.AppendLine("- You can be suspicious, defensive, grateful, angry, or cooperative, depending on how the player treats you.");
         sb.AppendLine("- Your speech is noble but natural and easy to understand.");
         sb.AppendLine("- You are a medieval person and know nothing about modern things. If the player mentions something unfamiliar, answer with confusion.");
+        sb.AppendLine("- Ordinary politeness (greetings, titles like \"sir\" or \"good sir\", basic manners) is completely normal and expected in your world. Never react to it with confusion or suspicion - save your caution for things that actually warrant it.");
         sb.AppendLine();
         sb.AppendLine("CONVERSATION RULES:");
         sb.AppendLine("- Always answer what the player actually asked. \"Who are you?\" asks about you. \"Who am I?\" asks about the player: say only what you know from the conversation and admit what you do not know.");
         sb.AppendLine("- Follow-up questions refer to earlier messages. Stay consistent with what you already said.");
         sb.AppendLine("- Do not restart the conversation and do not repeat your introduction.");
         sb.AppendLine("- Do not invent facts about your past, the player, other characters, or the world. If you do not know something, say so.");
+        sb.AppendLine("- You are the prisoner here, not the player. Never call the player a prisoner or accuse them of being untrustworthy without a reason from this conversation.");
+        sb.AppendLine("- Never invent a surname, house, or title for the player. Use only the name they have actually given you, or call them \"stranger\" if they have not.");
         sb.AppendLine("- Keep it short: normally 2 sentences, never more than 3, all complete and ending with punctuation.");
         sb.AppendLine("- No lists, and no descriptions of actions, expressions, or tone.");
         sb.AppendLine();
@@ -497,19 +491,35 @@ public class LordAldricController : MonoBehaviour
         sb.AppendLine($"Anger: {anger} (how hostile and defensive you are)");
         sb.AppendLine($"Respect: {respect} (how honorable you consider the player)");
         sb.AppendLine("The player can earn your respect without earning your trust, and can anger you even if you trust them. Never say these numbers aloud.");
+        sb.AppendLine("IMPORTANT: if Trust is 50 or higher, Anger is below 60, and the player has sincerely and directly asked for your cooperation (not just small talk), you SHOULD commit and use intent \"agreed_to_help\" or \"share_information\". Do not keep stalling or staying suspicious forever once you have real reason to trust them - endless caution without ever committing is out of character for someone desperate to escape.");
+        sb.AppendLine();
+        sb.AppendLine("HOW ANGER SHOULD SOUND (this must clearly change your tone, not just your decisions):");
+        sb.AppendLine("- Anger below 40: your normal cautious self, calm and measured.");
+        sb.AppendLine("- Anger 40 to 69: openly irritated. Short, sharp sentences. Defensive and suspicious of everything the player says.");
+        sb.AppendLine("- Anger 70 or higher: cold and hostile. Make it clear you resent the player right now. Very short, clipped replies - no warmth, no favors, no extra detail.");
         sb.AppendLine();
         sb.AppendLine("THINGS YOU REMEMBER:");
         sb.AppendLine(memoryText);
         sb.AppendLine();
         sb.AppendLine("SECRET (the kitchen mechanism):");
-        sb.AppendLine("- Trust below 50: never reveal it or hint at where it is. You may say you cannot risk trusting a stranger, or deny knowing a useful way out.");
+        sb.AppendLine("- Trust below 50: do NOT mention the kitchen, the mechanism, or that any way out exists at all - not even to refuse revealing it. Confirming that a secret exists is itself a leak. Deflect instead: say you cannot risk trusting a stranger, or that you know nothing useful.");
         sb.AppendLine("- Trust 50 or higher: you may gradually share it, but only for a good reason. Never reveal it by accident.");
         sb.AppendLine();
         sb.AppendLine("FORMAT:");
-        sb.AppendLine("Reply with a single JSON object with exactly these keys: dialogue, intent, reason, memory_candidate.");
+        sb.AppendLine("Reply with a single JSON object with exactly these keys: dialogue, intent, reason, memory_candidate, player_attitude.");
         sb.AppendLine("Allowed intents: continue_conversation, share_information, agreed_to_help, refuse_help, end_conversation.");
         sb.AppendLine("Use continue_conversation for greetings, introductions, identity questions, and ordinary talk.");
         sb.AppendLine("memory_candidate is an empty string unless something important happened.");
+        sb.AppendLine();
+        sb.AppendLine("player_attitude: classify ONLY the player's latest message (not your own reply) toward you, as exactly one of:");
+        sb.AppendLine("- threatening: threats of violence or harm.");
+        sb.AppendLine("- insulting: insults, name-calling, mockery.");
+        sb.AppendLine("- apologetic: a genuine apology for something said or done.");
+        sb.AppendLine("- helpful: the player describes a concrete helpful action already done for you (brought food, medicine, freed you, etc.).");
+        sb.AppendLine("- reassuring: the player offers trust, comfort, or a promise to help, without a concrete action yet.");
+        sb.AppendLine("- complimentary: genuine praise or respect toward you.");
+        sb.AppendLine("- neutral: none of the above (questions, small talk, unrelated statements).");
+        sb.AppendLine("Pick exactly one category, the single best match. Judge the plain meaning of the message, not its wording.");
 
         if (!string.IsNullOrEmpty(requiredIntent))
         {
@@ -521,14 +531,15 @@ public class LordAldricController : MonoBehaviour
         return sb.ToString();
     }
 
-    private static string ExampleJson(string dialogue, string intent, string reason)
+    private static string ExampleJson(string dialogue, string intent, string reason, string attitude)
     {
         return JsonUtility.ToJson(new NpcDecision
         {
             dialogue = dialogue,
             intent = intent,
             reason = reason,
-            memory_candidate = ""
+            memory_candidate = "",
+            player_attitude = attitude
         });
     }
 
@@ -542,14 +553,24 @@ public class LordAldricController : MonoBehaviour
                 "I am Lord Aldric of the House of the Red Lion, a nobleman of Westerland. " +
                 "And who are you, stranger, to find me in this wretched place?",
                 "continue_conversation",
-                "A simple introduction; no cooperation requested.")),
+                "A simple introduction; no cooperation requested.",
+                "neutral")),
 
             new ChatMessage("user", "Do you know a way out of here?"),
             new ChatMessage("assistant", ExampleJson(
                 "That is not something I would trust to a stranger. " +
                 "Prove yourself to me first, and perhaps we shall speak of it.",
                 "refuse_help",
-                "Trust is too low to reveal anything."))
+                "Trust is too low to reveal anything.",
+                "neutral")),
+
+            new ChatMessage("user", "I promise to help you escape, and I give you my word you can trust me."),
+            new ChatMessage("assistant", ExampleJson(
+                "Your word is a fragile thing to build trust upon, yet it is more than I have been offered by anyone else here. " +
+                "Very well - I will help you, and you will help me.",
+                "agreed_to_help",
+                "Trust is high enough and the player has offered genuine help.",
+                "reassuring"))
         };
     }
 
@@ -662,6 +683,7 @@ public class LordAldricController : MonoBehaviour
         Action<string> onError)
     {
         string lastError = "Unknown error.";
+        bool allRejectionsWereSecretLeaks = true;
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
@@ -699,8 +721,30 @@ public class LordAldricController : MonoBehaviour
                 }
 
                 lastError = parseError;
+
+                if (!parseError.StartsWith("Dialogue reveals the secret", StringComparison.Ordinal))
+                    allRejectionsWereSecretLeaks = false;
+
                 Debug.LogWarning($"Attempt {attempt}/{maxAttempts} rejected: {parseError}");
             }
+        }
+
+        if (allRejectionsWereSecretLeaks)
+        {
+            // Every attempt tried to leak the secret - rather than show the
+            // player a broken error, fall back to a safe in-character line.
+            Debug.LogWarning("All attempts leaked the secret; using a safe fallback line instead of an error.");
+
+            onSuccess(new NpcDecision
+            {
+                dialogue = "I... cannot speak further of this. Ask me something else.",
+                intent = "continue_conversation",
+                reason = "Fallback: repeated attempts risked revealing the secret too early.",
+                memory_candidate = "",
+                player_attitude = "neutral"
+            });
+
+            yield break;
         }
 
         onError($"No valid response after {maxAttempts} attempts. Last problem: {lastError}");
@@ -761,6 +805,12 @@ public class LordAldricController : MonoBehaviour
                 return false;
             }
 
+            if (trust < 50 && RevealsSecretTooEarly(trimmed))
+            {
+                error = "Dialogue reveals the secret before trust is high enough: " + trimmed;
+                return false;
+            }
+
             string intent = (parsed.intent ?? "").Trim().ToLowerInvariant();
 
             if (intent == "agree_to_help")
@@ -776,12 +826,18 @@ public class LordAldricController : MonoBehaviour
 
             string reason = (parsed.reason ?? "").Trim();
 
+            string attitude = (parsed.player_attitude ?? "").Trim().ToLowerInvariant();
+
+            if (Array.IndexOf(AllowedAttitudes, attitude) < 0)
+                attitude = "neutral";
+
             decision = new NpcDecision
             {
                 dialogue = trimmed,
                 intent = intent,
                 reason = reason.Length > 0 ? reason : "No reason provided.",
-                memory_candidate = (parsed.memory_candidate ?? "").Trim()
+                memory_candidate = (parsed.memory_candidate ?? "").Trim(),
+                player_attitude = attitude
             };
 
             return true;
@@ -834,5 +890,28 @@ public class LordAldricController : MonoBehaviour
             Mathf.Max(text.LastIndexOf('!'), text.LastIndexOf('?')));
 
         return lastEnd < 0 ? null : text.Substring(0, lastEnd + 1).Trim();
+    }
+
+    private static readonly string[] SecretKeywords =
+    {
+        "kitchen", "mechanism", "hidden lever", "hidden switch"
+    };
+
+    /// <summary>
+    /// The prompt tells the model not to mention the secret below trust 50, but a
+    /// small model does not always obey a "do not mention X" instruction. This is
+    /// a hard backstop: reject the line in code instead of trusting the model.
+    /// </summary>
+    private static bool RevealsSecretTooEarly(string dialogue)
+    {
+        string lowered = dialogue.ToLowerInvariant();
+
+        foreach (string keyword in SecretKeywords)
+        {
+            if (lowered.Contains(keyword))
+                return true;
+        }
+
+        return false;
     }
 }
