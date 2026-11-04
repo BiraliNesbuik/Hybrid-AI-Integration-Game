@@ -6,6 +6,11 @@ public class StartMenuController : MonoBehaviour
     [SerializeField] private GameObject menuCamera;
     [SerializeField] private GameObject playerCamera;
 
+    [Header("Music")]
+    [SerializeField] private AudioSource musicSource;
+    [SerializeField] private AudioClip menuMusic;
+    [SerializeField] private AudioClip gameplayMusic;
+
     private void Start()
     {
         // Runs after every script's Awake(), so this reliably overrides
@@ -29,6 +34,8 @@ public class StartMenuController : MonoBehaviour
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
+
+        PlayMusic(menuMusic);
     }
 
     public void OnStartButtonClicked()
@@ -51,5 +58,19 @@ public class StartMenuController : MonoBehaviour
         Time.timeScale = 1f;
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        PlayMusic(gameplayMusic);
+    }
+
+    private void PlayMusic(AudioClip clip)
+    {
+        if (musicSource == null || clip == null || musicSource.clip == clip)
+        {
+            return;
+        }
+
+        musicSource.clip = clip;
+        musicSource.loop = true;
+        musicSource.Play();
     }
 }

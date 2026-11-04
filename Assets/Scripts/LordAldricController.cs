@@ -137,6 +137,34 @@ public class LordAldricController : MonoBehaviour
         "helpful", "reassuring", "complimentary", "neutral"
     };
 
+    private static readonly string[] ObviousApologyPhrases =
+    {
+        "i apologize", "i'm sorry", "i am sorry", "my apologies", "forgive me", "my bad"
+    };
+
+    /// <summary>
+    /// Safety net: the LLM has occasionally classified a clear apology as
+    /// "insulting"/"threatening" (likely still reacting to the player's
+    /// earlier tone), which would make anger rise instead of fall right when
+    /// the player tries to make up. A message containing an unmistakable
+    /// apology phrase is treated as apologetic no matter what the LLM said.
+    /// </summary>
+    private static string OverrideAttitudeIfObviousApology(string playerMessage, string attitude)
+    {
+        if (attitude != "insulting" && attitude != "threatening")
+            return attitude;
+
+        string lowered = playerMessage.ToLowerInvariant();
+
+        foreach (string phrase in ObviousApologyPhrases)
+        {
+            if (lowered.Contains(phrase))
+                return "apologetic";
+        }
+
+        return attitude;
+    }
+
     // -----------------------------
     // RUNTIME STATE
     // -----------------------------
@@ -289,7 +317,8 @@ public class LordAldricController : MonoBehaviour
         }
 
         // Commit only after a valid response.
-        UpdateRelationship(result.player_attitude);
+        string appliedAttitude = OverrideAttitudeIfObviousApology(playerMessage, result.player_attitude);
+        UpdateRelationship(appliedAttitude);
 
         conversationHistory.Add(new ChatMessage("user", playerMessage));
         conversationHistory.Add(new ChatMessage("assistant", result.dialogue));
@@ -303,21 +332,22 @@ public class LordAldricController : MonoBehaviour
         RefreshRelationshipUi();
 
         Debug.Log($"Aldric: {result.dialogue}");
-        Debug.Log($"Intent: {result.intent} | Reason: {result.reason} | Player attitude: {result.player_attitude}");
+        string attitudeNote = appliedAttitude == result.player_attitude
+            ? appliedAttitude
+            : $"{result.player_attitude} -> overridden to {appliedAttitude} (obvious apology)";
+        Debug.Log($"Intent: {result.intent} | Reason: {result.reason} | Player attitude: {attitudeNote}");
         Debug.Log($"Trust: {trust} | Anger: {anger} | Respect: {respect}");
 
-        // Primary trigger: the trust number itself, computed every turn from the
-        // LLM's own attitude classification - more reliable than trusting the
-        // LLM to also correctly self-report "agreed_to_help" in a second field.
-        // Kept together with the intent check so a genuine LLM agreement still
-        // counts even before trust reaches the threshold.
+        // The door only unlocks when BOTH are true: the trust/anger numbers
+        // allow cooperation, AND this specific message is actually the moment
+        // Aldric agrees - not just trust silently crossing a number mid-chat.
         bool trustThresholdReached = trust >= 60 && anger < 60;
         bool intentAgreed = result.intent == "agreed_to_help" || result.intent == "share_information";
 
-        if (!doorUnlocked && (trustThresholdReached || intentAgreed))
+        if (!doorUnlocked && trustThresholdReached && intentAgreed)
         {
             doorUnlocked = true;
-            Debug.Log($"Door unlocked. Reason: {(trustThresholdReached ? "trust threshold reached" : "LLM intent")}.");
+            Debug.Log("Door unlocked: trust threshold reached and Aldric agreed to help.");
             onDoorUnlocked?.Invoke();
         }
 
@@ -388,7 +418,7 @@ public class LordAldricController : MonoBehaviour
                 break;
             case "apologetic":
                 anger -= 7;
-                trust += 10;
+                trust += 5;
                 respect += 2;
                 break;
             case "helpful":
@@ -398,11 +428,11 @@ public class LordAldricController : MonoBehaviour
                 break;
             case "reassuring":
                 anger -= 2;
-                trust += 10;
+                trust += 5;
                 break;
             case "complimentary":
                 respect += 5;
-                trust += 10;
+                trust += 5;
                 break;
             // "neutral" or anything unrecognized: no change.
         }
@@ -464,7 +494,7 @@ public class LordAldricController : MonoBehaviour
         sb.AppendLine("- This dungeon is NOT yours. It belongs to your Batanian captors. Never call it \"my dungeon\" or imply you own or rule this place - you are a prisoner here, nothing more.");
         sb.AppendLine("- You are currently in Batania, the enemy kingdom, not in Westerland. You have not seen Westerland in a long time. The player is here with you in this Batanian dungeon, right now - never ask what they are doing \"in Westerland\" or talk as if either of you is there.");
         sb.AppendLine("- As a noble you had more freedom than other prisoners, so you explored the dungeon and memorized its layout. It has only one exit, which is normally guarded and locked.");
-        sb.AppendLine("- You discovered a hidden mechanism in the kitchen that opens that exit. You have told nobody. It is extremely valuable to you.");
+        sb.AppendLine("- You have a key hidden on your person - sewn into the lining of your sleeve - that unlocks this very cell door. You have told nobody. It is extremely valuable to you.");
         sb.AppendLine("- A prisoner riot has just broken out. Prisoners mistook you for a Batanian nobleman and beat you unconscious. Your leg is badly injured and walking is difficult.");
         sb.AppendLine("- Most guards left to stop the escaping prisoners and believe the unconscious prisoners are dead.");
         sb.AppendLine("- You have just woken up and met the player. You need help to escape, but you are suspicious because you were just attacked by people who mistook you for an enemy.");
@@ -501,8 +531,8 @@ public class LordAldricController : MonoBehaviour
         sb.AppendLine("THINGS YOU REMEMBER:");
         sb.AppendLine(memoryText);
         sb.AppendLine();
-        sb.AppendLine("SECRET (the kitchen mechanism):");
-        sb.AppendLine("- Trust below 50: do NOT mention the kitchen, the mechanism, or that any way out exists at all - not even to refuse revealing it. Confirming that a secret exists is itself a leak. Deflect instead: say you cannot risk trusting a stranger, or that you know nothing useful.");
+        sb.AppendLine("SECRET (the hidden key):");
+        sb.AppendLine("- Trust below 50: do NOT mention the key, that you are hiding anything, or that you have any way to open this door - not even to refuse revealing it. Confirming that a secret exists is itself a leak. Deflect instead: say you cannot risk trusting a stranger, or that you know nothing useful.");
         sb.AppendLine("- Trust 50 or higher: you may gradually share it, but only for a good reason. Never reveal it by accident.");
         sb.AppendLine();
         sb.AppendLine("FORMAT:");
@@ -894,7 +924,7 @@ public class LordAldricController : MonoBehaviour
 
     private static readonly string[] SecretKeywords =
     {
-        "kitchen", "mechanism", "hidden lever", "hidden switch"
+        "hidden key", "a key", "my key", "the key", "sewn into"
     };
 
     /// <summary>
