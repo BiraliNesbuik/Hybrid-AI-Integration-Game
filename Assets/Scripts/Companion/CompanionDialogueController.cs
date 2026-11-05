@@ -1,34 +1,45 @@
-using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
-// Companion speech lines, written by hand - no LLM involved here, by design.
+// Companion speech, written by hand - no LLM involved here, by design.
+// A greeting line plus a fixed set of clickable questions, each with its
+// own answer. Fill the greeting and questions in the Inspector.
 public class CompanionDialogueController : MonoBehaviour
 {
+    [System.Serializable]
+    public class DialogueQA
+    {
+        public string question;
+        [TextArea] public string answer;
+    }
+
     [SerializeField] private Transform playerTransform;
     [SerializeField] private GameObject interactPrompt;
     [SerializeField] private GameObject dialoguePanel;
     [SerializeField] private TMP_Text dialogueText;
 
+    [Header("Questions (one button per entry, in order)")]
+    [SerializeField] private Button[] optionButtons;
+    [SerializeField] private TMP_Text[] optionButtonLabels;
+    [SerializeField] private Button closeButton;
+
     [SerializeField] private float interactRange = 4f;
     [SerializeField] private float viewAngleThreshold = 35f;
-    [SerializeField] private float lineDisplaySeconds = 4f;
 
     [TextArea]
     [SerializeField]
-    private string[] dialogueLines =
+    private string greetingLine = "Hey there, my name is Bindik. You must be a prisoner.";
+
+    [SerializeField]
+    private DialogueQA[] questions =
     {
-        "Stay close, I've got your back.",
-        "This place gives me the creeps... but I've got you.",
-        "If that lever needs pulling again, just say the word.",
-        "We've come a long way together, haven't we?",
-        "Careful where you step - this castle doesn't forgive mistakes.",
-        "I won't let anything happen to you.",
-        "Let's find a way out of here, together."
+        new DialogueQA { question = "Where are we?", answer = "" },
+        new DialogueQA { question = "What are you?", answer = "" },
+        new DialogueQA { question = "What are we doing here?", answer = "" }
     };
 
-    private int nextLineIndex;
     private bool dialogueOpen;
 
     private void Start()
@@ -41,6 +52,20 @@ public class CompanionDialogueController : MonoBehaviour
         if (dialoguePanel != null)
         {
             dialoguePanel.SetActive(false);
+        }
+
+        for (int i = 0; i < optionButtons.Length; i++)
+        {
+            int index = i; // capture for the closure below
+            if (optionButtons[i] != null)
+            {
+                optionButtons[i].onClick.AddListener(() => ShowAnswer(index));
+            }
+        }
+
+        if (closeButton != null)
+        {
+            closeButton.onClick.AddListener(CloseDialogue);
         }
     }
 
@@ -60,7 +85,7 @@ public class CompanionDialogueController : MonoBehaviour
 
         if (canInteract && Keyboard.current.fKey.wasPressedThisFrame)
         {
-            StartCoroutine(ShowNextLine());
+            OpenDialogue();
         }
     }
 
@@ -78,7 +103,7 @@ public class CompanionDialogueController : MonoBehaviour
         return angle <= viewAngleThreshold;
     }
 
-    private IEnumerator ShowNextLine()
+    private void OpenDialogue()
     {
         dialogueOpen = true;
 
@@ -87,24 +112,50 @@ public class CompanionDialogueController : MonoBehaviour
             interactPrompt.SetActive(false);
         }
 
-        if (dialogueLines.Length > 0 && dialogueText != null)
-        {
-            dialogueText.text = dialogueLines[nextLineIndex];
-            nextLineIndex = (nextLineIndex + 1) % dialogueLines.Length;
-        }
-
         if (dialoguePanel != null)
         {
             dialoguePanel.SetActive(true);
         }
 
-        yield return new WaitForSeconds(lineDisplaySeconds);
+        if (dialogueText != null)
+        {
+            dialogueText.text = greetingLine;
+        }
+
+        for (int i = 0; i < optionButtons.Length; i++)
+        {
+            if (optionButtons[i] == null)
+            {
+                continue;
+            }
+
+            bool hasQuestion = i < questions.Length;
+            optionButtons[i].gameObject.SetActive(hasQuestion);
+
+            if (hasQuestion && i < optionButtonLabels.Length && optionButtonLabels[i] != null)
+            {
+                optionButtonLabels[i].text = questions[i].question;
+            }
+        }
+    }
+
+    private void ShowAnswer(int index)
+    {
+        if (index < 0 || index >= questions.Length || dialogueText == null)
+        {
+            return;
+        }
+
+        dialogueText.text = questions[index].answer;
+    }
+
+    private void CloseDialogue()
+    {
+        dialogueOpen = false;
 
         if (dialoguePanel != null)
         {
             dialoguePanel.SetActive(false);
         }
-
-        dialogueOpen = false;
     }
 }
