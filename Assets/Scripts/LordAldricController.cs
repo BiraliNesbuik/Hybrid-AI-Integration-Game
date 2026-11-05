@@ -856,7 +856,9 @@ public class LordAldricController : MonoBehaviour
         "i am not able to help", "i'm not able to help",
         "not yet, at least", "not yet ready", "not ready to use",
         "not yet certain", "not certain i can trust you enough",
-        "not sure i can trust you enough"
+        "not sure i can trust you enough", "not yet",
+        "must be certain", "need to be certain", "must be sure", "need to be sure",
+        "will not use it", "won't use it", "will not use the key", "won't use the key"
     };
 
     private static bool DialogueContradictsCooperation(string dialogue, string intent)
