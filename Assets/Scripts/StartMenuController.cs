@@ -13,8 +13,6 @@ public class StartMenuController : MonoBehaviour
 
     private void Start()
     {
-        // Runs after every script's Awake(), so this reliably overrides
-        // PlayerController's Awake()-time cursor lock regardless of script order.
         Time.timeScale = 0f;
 
         if (menuPanel != null)

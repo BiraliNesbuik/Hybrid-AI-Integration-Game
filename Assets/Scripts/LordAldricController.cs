@@ -9,15 +9,8 @@ using UnityEngine.Events;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 
-/// <summary>
-/// Lord Aldric NPC: Ollama (Llama 3.2) for dialogue, game rules for decisions.
-/// </summary>
 public class LordAldricController : MonoBehaviour
 {
-    // -----------------------------
-    // INSPECTOR SETTINGS
-    // -----------------------------
-
     [Header("Ollama Settings")]
     [SerializeField] private string modelName = "lord-aldric-en";
     [SerializeField] private string ollamaUrl = "http://localhost:11434/api/chat";
@@ -40,10 +33,6 @@ public class LordAldricController : MonoBehaviour
 
     [Header("Game State")]
     [SerializeField] private UnityEvent onDoorUnlocked;
-
-    // -----------------------------
-    // JSON DATA CLASSES
-    // -----------------------------
 
     [Serializable]
     private class ChatMessage
@@ -99,10 +88,6 @@ public class LordAldricController : MonoBehaviour
         public string player_attitude;
     }
 
-    // -----------------------------
-    // CONSTANTS
-    // -----------------------------
-
     private static readonly string[] AllowedIntents =
     {
         "continue_conversation",
@@ -128,9 +113,6 @@ public class LordAldricController : MonoBehaviour
         @"\b(i|i'm|i've|i'll|i'd|my|me|mine|you|your|you're|we|us|our)\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    // The LLM classifies the player's message into one of these every turn;
-    // the relationship numbers move based on that classification instead of
-    // a fixed keyword list, so natural phrasing is understood correctly.
     private static readonly string[] AllowedAttitudes =
     {
         "threatening", "insulting", "apologetic",
@@ -142,13 +124,6 @@ public class LordAldricController : MonoBehaviour
         "i apologize", "i'm sorry", "i am sorry", "my apologies", "forgive me", "my bad"
     };
 
-    /// <summary>
-    /// Safety net: the LLM has occasionally classified a clear apology as
-    /// "insulting"/"threatening" (likely still reacting to the player's
-    /// earlier tone), which would make anger rise instead of fall right when
-    /// the player tries to make up. A message containing an unmistakable
-    /// apology phrase is treated as apologetic no matter what the LLM said.
-    /// </summary>
     private static string OverrideAttitudeIfObviousApology(string playerMessage, string attitude)
     {
         if (attitude != "insulting" && attitude != "threatening")
@@ -165,20 +140,12 @@ public class LordAldricController : MonoBehaviour
         return attitude;
     }
 
-    // -----------------------------
-    // RUNTIME STATE
-    // -----------------------------
-
     private readonly List<ChatMessage> conversationHistory = new List<ChatMessage>();
     private readonly List<string> memories = new List<string>();
 
     private bool isProcessing;
     private bool conversationEnded;
     private bool doorUnlocked;
-
-    // -----------------------------
-    // UNITY LIFECYCLE
-    // -----------------------------
 
     private void Start()
     {
@@ -189,7 +156,6 @@ public class LordAldricController : MonoBehaviour
                 "in the Inspector.");
         }
 
-        // Button and Enter key are wired in code.
         if (sendButton != null)
             sendButton.onClick.AddListener(SendPlayerMessage);
 
@@ -212,10 +178,6 @@ public class LordAldricController : MonoBehaviour
     {
         SendPlayerMessage();
     }
-
-    // -----------------------------
-    // PUBLIC ENTRY POINTS
-    // -----------------------------
 
     [ContextMenu("Test Ollama Connection")]
     private void TestOllamaConnection()
@@ -262,10 +224,6 @@ public class LordAldricController : MonoBehaviour
         return true;
     }
 
-    // -----------------------------
-    // MAIN FLOW
-    // -----------------------------
-
     private IEnumerator ProcessMessage(string playerMessage)
     {
         isProcessing = true;
@@ -286,7 +244,6 @@ public class LordAldricController : MonoBehaviour
 
         if (result == null)
         {
-            // Nothing was changed yet, so there is nothing to roll back.
             Debug.LogError($"Could not get a valid response from Aldric: {error}");
 
             SetDialogue(string.IsNullOrEmpty(previousText)
@@ -298,7 +255,6 @@ public class LordAldricController : MonoBehaviour
             yield break;
         }
 
-        // Commit only after a valid response.
         string appliedAttitude = OverrideAttitudeIfObviousApology(playerMessage, result.player_attitude);
         UpdateRelationship(appliedAttitude);
 
@@ -320,12 +276,6 @@ public class LordAldricController : MonoBehaviour
         Debug.Log($"Intent: {result.intent} | Reason: {result.reason} | Player attitude: {attitudeNote}");
         Debug.Log($"Trust: {trust} | Anger: {anger} | Respect: {respect}");
 
-        // The door only unlocks when BOTH are true: the trust/anger numbers
-        // allow cooperation, AND the LLM's own intent for this reply is
-        // actually a cooperation intent. GetValidResponse already gives the
-        // LLM extra chances (via DetermineRequiredIntent) to reach this
-        // intent when the numbers clearly call for it - the action trigger
-        // itself stays the LLM's structured output, never a raw text match.
         bool trustThresholdReached = trust >= 60 && anger < 60;
         bool intentAgreed = result.intent == "agreed_to_help" || result.intent == "share_information";
 
@@ -348,10 +298,6 @@ public class LordAldricController : MonoBehaviour
         if (!conversationEnded && playerInput != null)
             playerInput.ActivateInputField();
     }
-
-    // -----------------------------
-    // UI HELPERS
-    // -----------------------------
 
     private void SetDialogue(string text)
     {
@@ -378,15 +324,6 @@ public class LordAldricController : MonoBehaviour
             playerInput.interactable = canType;
     }
 
-    // -----------------------------
-    // RELATIONSHIP RULES
-    // -----------------------------
-
-    /// <summary>
-    /// Moves trust/anger/respect based on the LLM's own classification of the
-    /// player's last message (see player_attitude in the JSON schema), instead
-    /// of matching a fixed keyword list against free-form text.
-    /// </summary>
     private void UpdateRelationship(string attitude)
     {
         switch (attitude)
@@ -427,21 +364,11 @@ public class LordAldricController : MonoBehaviour
         respect = Mathf.Clamp(respect, 0, 100);
     }
 
-    /// <summary>
-    /// The game rules, not the LLM, decide whether cooperation is allowed -
-    /// and, when the numbers clearly call for it, whether the LLM should be
-    /// asked again to actually commit. Either way, the final dialogue is
-    /// still generated by the LLM (via the retry in GetValidResponse) - this
-    /// only decides which intent that retry should aim for.
-    /// </summary>
     private string ValidateDecision(string intent, string playerMessage)
     {
         if (anger >= 85)
             return "end_conversation";
 
-        // Only the game rule above may end the conversation. The LLM choosing
-        // "end_conversation" on its own, with no real reason, would lock the
-        // player out of the dialogue permanently - so that choice is rejected.
         if (intent == "end_conversation")
             return "continue_conversation";
 
@@ -451,10 +378,6 @@ public class LordAldricController : MonoBehaviour
         if (cooperating && !trustAllowsCooperation)
             return "refuse_help";
 
-        // The numbers support cooperation, the player is directly asking for
-        // it, but the LLM did not commit on its own - give it one more pass
-        // aimed explicitly at "agreed_to_help" instead of accepting a refusal
-        // that the relationship numbers no longer justify.
         if (!cooperating && trustAllowsCooperation && ContainsDirectDoorRequest(playerMessage))
             return "agreed_to_help";
 
@@ -471,10 +394,6 @@ public class LordAldricController : MonoBehaviour
         while (memories.Count > 10)
             memories.RemoveAt(0);
     }
-
-    // -----------------------------
-    // PROMPT
-    // -----------------------------
 
     private string BuildSystemPrompt(string requiredIntent)
     {
@@ -522,7 +441,7 @@ public class LordAldricController : MonoBehaviour
         sb.AppendLine($"Anger: {anger} (how hostile and defensive you are)");
         sb.AppendLine($"Respect: {respect} (how honorable you consider the player)");
         sb.AppendLine("The player can earn your respect without earning your trust, and can anger you even if you trust them. Never say these numbers aloud.");
-        sb.AppendLine("IMPORTANT: if Trust is 50 or higher, Anger is below 60, and the player has sincerely and directly asked for your cooperation (not just small talk), you SHOULD commit and use intent \"agreed_to_help\" or \"share_information\". Do not keep stalling or staying suspicious forever once you have real reason to trust them - endless caution without ever committing is out of character for someone desperate to escape. If you DO commit in this reply, speak decisively: the key is used and the door opens right now, as you speak - not \"it may work\" or \"I must still be cautious\".");
+        sb.AppendLine("IMPORTANT: if Trust is 60 or higher, Anger is below 60, and the player has sincerely and directly asked for your cooperation (not just small talk), you SHOULD commit and use intent \"agreed_to_help\" or \"share_information\". Do not keep stalling or staying suspicious forever once you have real reason to trust them - endless caution without ever committing is out of character for someone desperate to escape. If you DO commit in this reply, speak decisively: the key is used and the door opens right now, as you speak - not \"it may work\" or \"I must still be cautious\".");
         sb.AppendLine();
         sb.AppendLine("HOW ANGER SHOULD SOUND (this must clearly change your tone, not just your decisions):");
         sb.AppendLine("- Anger below 40: your normal cautious self, calm and measured.");
@@ -534,7 +453,8 @@ public class LordAldricController : MonoBehaviour
         sb.AppendLine();
         sb.AppendLine("SECRET (the hidden key):");
         sb.AppendLine("- Trust below 50: do NOT mention the key, that you are hiding anything, or that you have any way to open this door - not even to refuse revealing it, and never claim or imply the door/exit is already unlocked or open. Never give directions, routes, or descriptions of corridors/paths toward the exit, even under threat - being threatened should make you MORE guarded, not less. Confirming that a secret exists is itself a leak. Deflect instead: say you cannot risk trusting a stranger, or that you know nothing useful.");
-        sb.AppendLine("- Trust 50 or higher: you may gradually share it, but only for a good reason. Never reveal it by accident.");
+        sb.AppendLine("- Trust 50 to 59: you may admit, for a good reason, that you have a key - but you are NOT yet ready to use it. Say so explicitly (e.g. \"I have a key, but I am not yet certain I can trust you enough to use it\"). Never say you will use it, unlock the door, or leave right now at this trust level - that still requires more trust than you currently have.");
+        sb.AppendLine("- Trust 60 or higher: you ARE ready now. If you decide to cooperate, commit fully and say so plainly - never say \"not yet\", \"not certain\", or anything hedging at this trust level, that phrasing is only for trust 50-59.");
         sb.AppendLine();
 
         if (doorUnlocked)
@@ -580,7 +500,6 @@ public class LordAldricController : MonoBehaviour
         });
     }
 
-    // Fixed example exchanges. Small models imitate these very strongly.
     private static List<ChatMessage> BuildFewShotMessages()
     {
         return new List<ChatMessage>
@@ -611,14 +530,6 @@ public class LordAldricController : MonoBehaviour
         };
     }
 
-    // -----------------------------
-    // RULES VS LLM
-    // -----------------------------
-
-    /// <summary>
-    /// If the model's intent breaks the game rules, regenerate with the required
-    /// intent. If the model still disobeys, the game rule wins.
-    /// </summary>
     private IEnumerator GetValidResponse(
         string playerMessage,
         Action<NpcDecision> onSuccess,
@@ -673,13 +584,13 @@ public class LordAldricController : MonoBehaviour
             }
         }
 
-        best.intent = requiredIntent;
+        if (!DialogueContradictsCooperation(best.dialogue, requiredIntent))
+        {
+            best.intent = requiredIntent;
+        }
+
         onSuccess(best);
     }
-
-    // -----------------------------
-    // OLLAMA REQUEST
-    // -----------------------------
 
     private string BuildRequestJson(string playerMessage, string requiredIntent)
     {
@@ -690,8 +601,6 @@ public class LordAldricController : MonoBehaviour
 
         messages.AddRange(BuildFewShotMessages());
 
-        // Marks the examples above as fiction, not something that happened to
-        // THIS player - otherwise the model can mistake them for real history.
         messages.Add(new ChatMessage("system",
             "The examples above never happened and are not part of this conversation. " +
             "Your real conversation with THIS player starts now, with no prior history " +
@@ -717,10 +626,6 @@ public class LordAldricController : MonoBehaviour
         return JsonUtility.ToJson(payload);
     }
 
-    /// <summary>
-    /// Retries when the output is cut off, invalid, or written like narration.
-    /// Connection errors are reported immediately.
-    /// </summary>
     private IEnumerator AskOllama(
         string playerMessage,
         string requiredIntent,
@@ -776,8 +681,6 @@ public class LordAldricController : MonoBehaviour
 
         if (allRejectionsWereSecretLeaks)
         {
-            // Every attempt tried to leak the secret - rather than show the
-            // player a broken error, fall back to a safe in-character line.
             Debug.LogWarning("All attempts leaked the secret; using a safe fallback line instead of an error.");
 
             onSuccess(new NpcDecision
@@ -794,10 +697,6 @@ public class LordAldricController : MonoBehaviour
 
         onError($"No valid response after {maxAttempts} attempts. Last problem: {lastError}");
     }
-
-    // -----------------------------
-    // PARSING AND OUTPUT CHECKS
-    // -----------------------------
 
     private bool TryParseDecision(
         string responseText,
@@ -861,12 +760,17 @@ public class LordAldricController : MonoBehaviour
             if (intent == "agree_to_help")
                 intent = "agreed_to_help";
 
-            // Unknown intent: fall back instead of throwing the whole reply away.
             if (Array.IndexOf(AllowedIntents, intent) < 0)
             {
                 intent = !string.IsNullOrEmpty(requiredIntent)
                     ? requiredIntent
                     : "continue_conversation";
+            }
+
+            if (DialogueContradictsCooperation(trimmed, intent))
+            {
+                error = "Dialogue refuses in words while intent agrees to cooperate: " + trimmed;
+                return false;
             }
 
             string reason = (parsed.reason ?? "").Trim();
@@ -916,10 +820,6 @@ public class LordAldricController : MonoBehaviour
         return !FirstOrSecondPerson.IsMatch(dialogue);
     }
 
-    /// <summary>
-    /// If the text ends mid-sentence, cut it back to the last complete sentence.
-    /// Returns null if there is no complete sentence.
-    /// </summary>
     private static string TrimToLastSentence(string text)
     {
         text = text.Trim();
@@ -946,11 +846,37 @@ public class LordAldricController : MonoBehaviour
         "to the left", "to the right", "exit is down", "exit is through"
     };
 
-    /// <summary>
-    /// The prompt tells the model not to mention the secret below trust 50, but a
-    /// small model does not always obey a "do not mention X" instruction. This is
-    /// a hard backstop: reject the line in code instead of trusting the model.
-    /// </summary>
+    private static readonly string[] RefusalPhrases =
+    {
+        "i do not know how", "i don't know how",
+        "i do not have the key", "i don't have the key",
+        "i am not in a position to help", "i'm not in a position to help",
+        "i cannot help you", "i can't help you",
+        "i do not know of any way", "i don't know of any way",
+        "i am not able to help", "i'm not able to help",
+        "not yet, at least", "not yet ready", "not ready to use",
+        "not yet certain", "not certain i can trust you enough",
+        "not sure i can trust you enough"
+    };
+
+    private static bool DialogueContradictsCooperation(string dialogue, string intent)
+    {
+        bool cooperating = intent == "agreed_to_help" || intent == "share_information";
+
+        if (!cooperating)
+            return false;
+
+        string lowered = dialogue.ToLowerInvariant();
+
+        foreach (string phrase in RefusalPhrases)
+        {
+            if (lowered.Contains(phrase))
+                return true;
+        }
+
+        return false;
+    }
+
     private static bool RevealsSecretTooEarly(string dialogue)
     {
         string lowered = dialogue.ToLowerInvariant();

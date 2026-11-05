@@ -3,9 +3,6 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
-// Companion speech, written by hand - no LLM involved here, by design.
-// A greeting line plus a fixed set of clickable questions, each with its
-// own answer. Fill the greeting and questions in the Inspector.
 public class CompanionDialogueController : MonoBehaviour
 {
     [System.Serializable]
@@ -107,6 +104,9 @@ public class CompanionDialogueController : MonoBehaviour
     {
         dialogueOpen = true;
 
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
         if (interactPrompt != null)
         {
             interactPrompt.SetActive(false);
@@ -157,5 +157,8 @@ public class CompanionDialogueController : MonoBehaviour
         {
             dialoguePanel.SetActive(false);
         }
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
     }
 }
