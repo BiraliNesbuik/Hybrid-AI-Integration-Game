@@ -154,6 +154,8 @@ sequenceDiagram
 
 Önemli bir tasarım kararı: kapıyı açan şey **her zaman LLM'in kendi `intent` kararıdır** — trust/anger sayıları yalnızca bu kararın *ne zaman* kabul edilebilir olduğunu belirler, kararın kendisini oluşturmaz. Geliştirme sürecinde, trust sayısı yeterliyken LLM'in yine de işbirliğine yanaşmadığı durumlarla karşılaşılmış; bu sorun, oyuncunun metnine bakıp doğrudan kapıyı açan bir kısayolla **değil**, LLM'e aynı altyapı (REQUIRED DECISION zorlama + yeniden deneme) ile gerçekten bir şans daha vererek çözülmüştür — böylece eylemi tetikleyen her zaman modelin kendi (yeniden üretilmiş) yapılandırılmış çıktısı olmuştur.
 
+Bu zorlamanın kendi içinde de bir tutarlılık kontrolü vardır: son deneme de beklenen kararı üretemezse, sistem `intent` alanını zorla değiştirmeden önce modelin **diyalog metninin** gerçekten işbirliğiyle çelişip çelişmediğini kontrol eder (`DialogueContradictsCooperation()`). Diyalog hâlâ "henüz hazır değilim" gibi bir reddediş içeriyorsa, `intent` zorlanmaz ve kapı o turda açılmaz — yani ekranda görünen metin ile tetiklenen oyun durumu birbirini asla yalanlamaz.
+
 ---
 
 ## 4. Hata Yönetimi Stratejisi
@@ -169,6 +171,7 @@ sequenceDiagram
 | Model "anlatıcı" gibi konuşuyor (3. şahıs) | `LooksLikeNarration()` ile tespit edilip reddedilir. |
 | Model, trust düşükken sırrı (anahtarı/çıkışı) açıklıyor | `RevealsSecretTooEarly()` — anahtar kelime tabanlı bir kod-seviyesi güvenlik ağı; prompt talimatına ek olarak, modelin talimatı görmezden geldiği durumları da yakalar. |
 | Model, oyun kuralına aykırı bir `intent` seçiyor (örn. trust düşükken işbirliği) | `ValidateDecision()` + yeniden deneme (modelin kendi diyaloğuyla, zorlanmış karara uygun yeniden üretim). |
+| Yeniden deneme de başarısız olur ve `intent` zorlanacak, ama diyalog metni hâlâ reddediyor (örn. "henüz hazır değilim") | `DialogueContradictsCooperation()` — bu durumda `intent` zorlanmaz, modelin dürüst (işbirliğine yanaşmayan) kararı korunur; kapı metinle çelişecek şekilde açılmaz. |
 | **4 denemenin tamamı özellikle sır sızdırma yüzünden başarısız olursa** | Oyuncuya hata göstermek yerine, güvenli, hazır bir "bundan bahsedemem" repliğiyle akışa devam edilir — konuşma hiç kilitlenmez. |
 | Model kendi kendine `end_conversation` seçip konuşmayı bitirmeye çalışıyor | Oyun kuralı (yalnızca Anger ≥ 85 gerçek bir bitiş nedenidir) bunu geçersiz kılar; aksi halde oyuncu kalıcı olarak konuşamaz hale gelirdi. |
 
