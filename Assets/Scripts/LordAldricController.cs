@@ -223,24 +223,6 @@ public class LordAldricController : MonoBehaviour
         SendMessageToAldric("Hello, Lord Aldric.");
     }
 
-    // TEMPORARY DEBUG TOOL: bypasses Ollama/LLM entirely and fires the door
-    // event directly, to check whether the door/lever wiring itself works
-    // independently of whether the LLM agrees to cooperate. Remove before
-    // final submission.
-    [ContextMenu("DEBUG: Force Unlock Door")]
-    private void DebugForceUnlockDoor()
-    {
-        if (doorUnlocked)
-        {
-            Debug.Log("DEBUG: Door was already unlocked.");
-            return;
-        }
-
-        doorUnlocked = true;
-        Debug.Log("DEBUG: Forcing onDoorUnlocked now (no LLM involved).");
-        onDoorUnlocked?.Invoke();
-    }
-
     public void SendPlayerMessage()
     {
         if (playerInput == null)
