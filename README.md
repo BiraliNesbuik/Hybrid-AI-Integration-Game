@@ -331,7 +331,14 @@ Bu senaryo, trust'ın tamamen doğal bir konuşmayla (selamlaşma → tanışma 
 
 ## 6. Ekran Görüntüleri
 
-*(Bu bölüme oyun içi ekran görüntüleri — başlangıç menüsü, companion'ın engeli aşması, Aldric diyalog ekranı, kapının açılması — eklenecektir.)*
+| | |
+|---|---|
+| **Başlangıç menüsü** | ![Başlangıç menüsü](docs/screenshots/01_start_menu.webp) |
+| **Companion (Bındık), fiziksel engele doğru giderken** | ![Companion engelde](docs/screenshots/02_companion_at_obstacle.png) |
+| **Engel açıldıktan sonra — NavMesh (mavi), kitaplık kaymış, kapı açık** | ![Engel açıldıktan sonra](docs/screenshots/03_obstacle_opened_navmesh.png) |
+| **Bındık'ın soru-cevap diyalog paneli** | ![Bındık diyaloğu](docs/screenshots/04_companion_dialogue.png) |
+| **Lord Aldric ile diyalog — Trust/Anger/Respect görünür** | ![Aldric diyaloğu](docs/screenshots/05_aldric_dialogue.png) |
+| **Bitiş ekranı** | ![Bitiş ekranı](docs/screenshots/06_end_screen.png) |
 
 ---
 
